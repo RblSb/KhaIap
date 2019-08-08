@@ -10,8 +10,10 @@ namespace Billing {
 	void init(void (*callback)(), void (*error)(), void (*purchase)(int status, String data));
 	void setCallbacks(void (*callback)(), void (*error)(), void (*purchase)(int status, String data));
 	void getProducts(String hxids, void (*callback)(int status, String data));
+	void getPurchases(void (*callback)(int status, String data));
 	void purchase(String hxid);
 	void consume(String hxid, void (*callback)(int status, String data));
+	void acknowledge(String hxid, void (*callback)(int status, String data));
 
 	extern "C" JNIEXPORT
 	void JNICALL Java_iap_Billing_onInitComplete(JNIEnv* env, jobject jCaller);
@@ -20,9 +22,13 @@ namespace Billing {
 	extern "C" JNIEXPORT
 	void JNICALL Java_iap_Billing_onGetProducts(JNIEnv* env, jobject jCaller, jint status, jstring jdata);
 	extern "C" JNIEXPORT
+	void JNICALL Java_iap_Billing_onGetPurchases(JNIEnv* env, jobject jCaller, jint status, jstring jdata);
+	extern "C" JNIEXPORT
 	void JNICALL Java_iap_Billing_onPurchase(JNIEnv* env, jobject jCaller, jint status, jstring jdata);
 	extern "C" JNIEXPORT
 	void JNICALL Java_iap_Billing_onConsume(JNIEnv* env, jobject jCaller, jint status, jstring jdata);
+	extern "C" JNIEXPORT
+	void JNICALL Java_iap_Billing_onAcknowledge(JNIEnv* env, jobject jCaller, jint status, jstring jdata);
 
 	// References
 	// https://github.com/openfl/openfl-native/issues/216

@@ -5,6 +5,8 @@ import com.android.billingclient.api.BillingClient;
 import com.android.billingclient.api.BillingResult;
 import com.android.billingclient.api.PurchasesUpdatedListener;
 import com.android.billingclient.api.Purchase;
+import com.android.billingclient.api.Purchase.PurchasesResult;
+import com.android.billingclient.api.Purchase.PurchaseState;
 import com.android.billingclient.api.SkuDetails;
 import com.android.billingclient.api.SkuDetailsParams;
 import com.android.billingclient.api.SkuDetailsResponseListener;
@@ -13,6 +15,8 @@ import com.android.billingclient.api.BillingFlowParams;
 import com.android.billingclient.api.BillingClient.BillingResponseCode;
 import com.android.billingclient.api.ConsumeResponseListener;
 import com.android.billingclient.api.ConsumeParams;
+import com.android.billingclient.api.AcknowledgePurchaseResponseListener;
+import com.android.billingclient.api.AcknowledgePurchaseParams;
 import tech.kode.kore.KoreActivity;
 import android.content.Intent;
 import android.util.Log;
@@ -30,7 +34,9 @@ public class Billing {
 	private static native void onInitError();
 	public static native void onPurchase(int status, String data);
 	private static native void onGetProducts(int status, String data);
-	public static native void onConsume(int status, String data);
+	private static native void onGetPurchases(int status, String data);
+	private static native void onConsume(int status, String data);
+	private static native void onAcknowledge(int status, String data);
 
 	private static BillingClient billingClient;
 	private static PurchasesListener listenerPurchases = new PurchasesListener();
@@ -91,6 +97,20 @@ public class Billing {
 		);
 	}
 
+	public static void getPurchases() {
+		PurchasesResult result = billingClient.queryPurchases(SkuType.INAPP);
+		List<Purchase> purchases = result.getPurchasesList();
+		if (purchases != null) {
+			for (Purchase purchase : purchases) {
+				PurchasesListener.cacheList.remove(purchase);
+				PurchasesListener.cacheList.add(purchase);
+			}
+		}
+		String jsonArray = arrayToJson(purchases);
+		int code = result.getResponseCode();
+		onGetPurchases(code, jsonArray);
+	}
+
 	public static void purchase(String id) {
 		SkuDetails skuDetails = null;
 		for (SkuDetails sku : cacheList) {
@@ -114,19 +134,12 @@ public class Billing {
 	}
 
 	public static void consume(final String id) {
-		Purchase purchase = null;
-		for (Purchase cache : PurchasesListener.cacheList) {
-			if (cache.getSku().equals(id)) {
-				purchase = cache;
-				break;
-			}
-		}
+		Purchase purchase = findPurchase(id);
 		if (purchase == null) {
 			Log.d("kore", id + " purchase id not found in cache");
 			return;
 		}
 
-		KoreActivity activity = KoreActivity.getInstance();
 		ConsumeParams consumeParams = ConsumeParams.newBuilder()
 			.setPurchaseToken(purchase.getPurchaseToken())
 			.setDeveloperPayload(purchase.getDeveloperPayload())
@@ -141,7 +154,41 @@ public class Billing {
 		});
 	}
 
-	public static <T> String arrayToJson(List<T> items) {
+	public static void acknowledge(final String id) {
+		Purchase purchase = findPurchase(id);
+		if (purchase == null) {
+			Log.d("kore", id + " purchase id not found in cache");
+			return;
+		}
+
+		if (purchase.getPurchaseState() != PurchaseState.PURCHASED) return;
+		// Acknowledge the purchase if it hasn't already been acknowledged.
+		if (purchase.isAcknowledged()) return;
+		AcknowledgePurchaseParams acknowledgePurchaseParams =
+		AcknowledgePurchaseParams.newBuilder()
+			.setPurchaseToken(purchase.getPurchaseToken())
+			.build();
+		billingClient.acknowledgePurchase(acknowledgePurchaseParams, new AcknowledgePurchaseResponseListener() {
+			@Override
+			public void onAcknowledgePurchaseResponse(BillingResult billingResult) {
+				int responseCode = billingResult.getResponseCode();
+				onAcknowledge(responseCode, id);
+			}
+		});
+	}
+
+	static Purchase findPurchase(final String id) {
+		Purchase purchase = null;
+		for (Purchase cache : PurchasesListener.cacheList) {
+			if (cache.getSku().equals(id)) {
+				purchase = cache;
+				break;
+			}
+		}
+		return purchase;
+	}
+
+	static <T> String arrayToJson(List<T> items) {
 		if (items == null) return "[]";
 		StringBuffer jsonArray = new StringBuffer("[");
 		for (T item : items) {

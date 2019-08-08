@@ -1,6 +1,7 @@
 package iap;
 
 import cpp.Callable;
+import haxe.Json;
 
 typedef Product = {
 	id:String,
@@ -44,8 +45,10 @@ private typedef PurchaseDetails = {
 }
 
 typedef GetProductsFunc = (products:Array<Product>)->Void;
+typedef GetPurchasesFunc = (purchases:Array<Purchase>)->Void;
 typedef PurchaseFunc = (status:PurchaseStatus, purchase:Purchase)->Void;
 typedef ConsumeFunc = (id:String)->Void;
+typedef OnError = (status:Int)->Void;
 
 #if !cpp
 class Iap {
@@ -62,8 +65,10 @@ class Iap {
 	public static function sendProducts(code:Int, data:String):Void {
 		_onGetProducts(code, data);
 	}
+	public static function getPurchases(onGet:GetPurchasesFunc, onError:OnError):Void {}
 	public static function purchase(id:String):Void {}
 	public static function consume(id:String, callback:ConsumeFunc):Void {}
+	public static function acknowledge(id:String, callback:ConsumeFunc):Void {}
 	static function _onGetProducts(status:Int, data:String):Void {
 		final skus:Array<SkuDetails> = Helper.parseSkuDetails(data);
 		final arr:Array<Product> = [];
@@ -85,8 +90,11 @@ class Iap {
 	static var onInitComplete:()->Void;
 	static var onInitError:()->Void;
 	static var onGetProducts:GetProductsFunc;
+	static var onGetPurchases:GetPurchasesFunc;
+	static var onGetPurchasesError:OnError;
 	static var onPurchase:PurchaseFunc;
 	static var onConsume:ConsumeFunc;
+	static var onAcknowledge:ConsumeFunc;
 
 	public static function init(onComplete:()->Void, onError:()->Void, onGetPurchase:PurchaseFunc):Void {
 		onInitComplete = onComplete;
@@ -124,6 +132,13 @@ class Iap {
 		Billing.getProducts(ids.join(","), func);
 	}
 
+	public static function getPurchases(onGet:GetPurchasesFunc, onError:OnError):Void {
+		onGetPurchases = onGet;
+		onGetPurchasesError = onError;
+		final func = Callable.fromStaticFunction(_onGetPurchases);
+		Billing.getPurchases(func);
+	}
+
 	public static function purchase(id:String):Void {
 		Billing.purchase(id);
 	}
@@ -132,6 +147,12 @@ class Iap {
 		onConsume = callback;
 		final func = Callable.fromStaticFunction(_onConsume);
 		Billing.consume(id, func);
+	}
+
+	public static function acknowledge(id:String, callback:ConsumeFunc):Void {
+		onAcknowledge = callback;
+		final func = Callable.fromStaticFunction(_onAcknowledge);
+		Billing.acknowledge(id, func);
 	}
 
 	static function _onInitComplete():Void {
@@ -162,9 +183,25 @@ class Iap {
 		onGetProducts(arr);
 	}
 
+	static function _onGetPurchases(status:Int, data:String):Void {
+		trace(status, data);
+		if (status != 0) {
+			onGetPurchasesError(status);
+			return;
+		}
+		final purchases:Array<PurchaseDetails> = Json.parse(data);
+		final arr:Array<Purchase> = [];
+		for (purchase in purchases) {
+			arr.push({
+				id: purchase.productId
+			});
+		}
+		onGetPurchases(arr);
+	}
+
 	static function _onPurchase(code:Int, data:String):Void {
 		trace(code, data);
-		final purchases:Array<PurchaseDetails> = haxe.Json.parse(data);
+		final purchases:Array<PurchaseDetails> = Json.parse(data);
 		final status:PurchaseStatus = switch (code) {
 			case 0: Ok;
 			case 1: Canceled;
@@ -180,6 +217,11 @@ class Iap {
 	static function _onConsume(status:Int, data:String):Void {
 		trace(status, data);
 		onConsume(data);
+	}
+
+	static function _onAcknowledge(status:Int, data:String):Void {
+		trace(status, data);
+		onAcknowledge(data);
 	}
 
 	static function _emptyCallback():Void {}
@@ -202,10 +244,14 @@ extern class Billing {
 	static function setCallbacks(complete:CppVoid, error:CppVoid, purchase:CppStatusData):Void;
 	@:native("Billing::getProducts")
 	static function getProducts(ids:String, fn:CppStatusData):Void;
+	@:native("Billing::getPurchases")
+	static function getPurchases(fn:CppStatusData):Void;
 	@:native("Billing::purchase")
 	static function purchase(id:String):Void;
 	@:native("Billing::consume")
 	static function consume(id:String, fn:CppStatusId):Void;
+	@:native("Billing::acknowledge")
+	static function acknowledge(id:String, fn:CppStatusId):Void;
 }
 #end
 
@@ -214,7 +260,7 @@ private class Helper {
 	public static function parseSkuDetails(data:String):Array<SkuDetails> {
 		// replacing Int64 to String in json data
 		data = ~/(price_amount_micros":)[ \t\n]*([0-9]+)/g.replace(data, '$1"$2"');
-		return haxe.Json.parse(data);
+		return Json.parse(data);
 	}
 
 	public static function parseMicro(m:String):String {

@@ -78,9 +78,12 @@ class Main {
 				switch(purchase.id) {
 					case "full_game": // purchase complete
 						final unlockFullGame = true;
+						// sending that purchase complete, so google will not refund this after three days
+						Iap.acknowledge(purchase.id, onAcknowledge);
 					case "buy100coins":
 						final coins = 100;
 						// if item is consumable (can be repurchased) we should call this:
+						// (instead of acknowledge)
 						Iap.consume(purchase.id, onConsume);
 				}
 			case Canceled: // user cancel purchase
@@ -88,20 +91,59 @@ class Main {
 			case AlreadyOwned:
 				// for example user bought "full_game" item on other device for current google account
 				// or you forgot to consume some shop item like "buy100coins"
-				// in first case you can restore purchase here if you know what id is requested
+				// in both cases best way is to use `Iap.getPurchases` (see more below demo)
+
+				// you can also restore purchase here if you know what id is requested
 				// (remember - `purchase` object is `null` here, thanks google)
-				// in second case - reset google play market manually, i guess
 				trace("AlreadyOwned");
 			case Error: // any other status currently
 				trace("Error");
 		}
 	}
 
+	static function onAcknowledge(id:String):Void {
+		// `id` item is sended to google server
+		// and can be restored with `Iap.getPurchases` for this account
+		trace('"$id" id acknowledge complete');
+	}
+
 	static function onConsume(id:String):Void {
 		// `id` item can be repurchased after this callback
 		trace('"$id" id consume complete');
 	}
+
 }
+```
+
+### Restoring and completing local purchases
+
+If app disconnected or crashed after local purchase, without `consume()/acknowledge()` completion, you should check local purchases and try to finish them on application start (and maybe in some other places like android `onResume` event). Don't be scary, this is easy. Same code can be used to restore non-consumable purchases:
+```haxe
+Iap.init(() -> {
+	Iap.getPurchases((purchases:Array<Purchase>) -> {
+		for (purchase in purchases) {
+			switch (purchase.id) {
+				case "full_game":
+					// okay, "full_game" item is already purchased
+					// lets unlock game and save it to game save (if game is locked)
+					if (!save.fullGameUnlocked) {
+						save.fullGameUnlocked = true;
+						saveMySaveMethod(save);
+					}
+					// we don't know if purchase acknowledged
+					// so we should call this always for non-consumable items at game start
+					// (if purchase acknowledged already, callback will not be fired, everything handled internally)
+					Iap.acknowledge(purchase.id, (id:String) -> {});
+				case "buy100coins":
+					// we don't need to add coins here if you add coins before consume call
+					// but you can add coins inside `onConsume` (demo above) if you think this is better way
+					Iap.consume(purchase.id, (id:String) -> {});
+					// remember: non-consumable items require `fullGameUnlocked`-like checks
+					// because they can be restored, when consumable cannot be
+			}
+		}
+	}, (status:Int) -> {});
+}, () -> {}, (status:PurchaseStatus, p:Purchase) -> {});
 ```
 
 Some other methods:
@@ -124,5 +166,4 @@ haxe.Timer.delay(() -> {
 
 ### TODO
 
-- `getPurchase(id:String, callback()->Void)` or something to restore purchases in a better way
 - Maybe iOS support someday with a lot of breaking changes

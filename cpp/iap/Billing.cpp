@@ -6,7 +6,9 @@ namespace Billing {
 	void (*onInitError)();
 	void (*onPurchase)(int status, String data);
 	void (*onGetProducts)(int status, String data);
+	void (*onGetPurchases)(int status, String data);
 	void (*onConsume)(int status, String data);
+	void (*onAcknowledge)(int status, String data);
 	bool attached = false;
 
 	JNIEnv* attachThread() {
@@ -63,6 +65,16 @@ namespace Billing {
 		detachThread();
 	}
 
+	void getPurchases(void (*callback)(int status, String data)) {
+		onGetPurchases = callback;
+		JNIEnv* env = attachThread();
+
+		jclass cls = KoreAndroid::findClass(env, "iap.Billing");
+		jmethodID methodId = env->GetStaticMethodID(cls, "getPurchases", "()V");
+		env->CallStaticVoidMethod(cls, methodId);
+		detachThread();
+	}
+
 	void purchase(String hxid) {
 		const char *id = hxid.c_str();
 		JNIEnv* env = attachThread();
@@ -84,6 +96,20 @@ namespace Billing {
 		jclass cls = KoreAndroid::findClass(env, "iap.Billing");
 		jstring jid = env->NewStringUTF(id);
 		jmethodID methodId = env->GetStaticMethodID(cls, "consume", "(Ljava/lang/String;)V");
+		env->CallStaticVoidMethod(cls, methodId, jid);
+
+		env->DeleteLocalRef(jid);
+		detachThread();
+	}
+
+	void acknowledge(String hxid, void (*callback)(int status, String data)) {
+		const char *id = hxid.c_str();
+		onAcknowledge = callback;
+		JNIEnv* env = attachThread();
+
+		jclass cls = KoreAndroid::findClass(env, "iap.Billing");
+		jstring jid = env->NewStringUTF(id);
+		jmethodID methodId = env->GetStaticMethodID(cls, "acknowledge", "(Ljava/lang/String;)V");
 		env->CallStaticVoidMethod(cls, methodId, jid);
 
 		env->DeleteLocalRef(jid);
@@ -112,6 +138,15 @@ namespace Billing {
 	}
 
 	extern "C" JNIEXPORT
+	void JNICALL Java_iap_Billing_onGetPurchases(JNIEnv* env, jobject jCaller, jint status, jstring jdata) {
+		const char *data = env->GetStringUTFChars(jdata, NULL);
+		AutoHaxe haxe("Java_iap_Billing_onGetPurchases");
+		String hxdata = String(data);
+		env->ReleaseStringUTFChars(jdata, data);
+		onGetPurchases((int)status, hxdata);
+	}
+
+	extern "C" JNIEXPORT
 	void JNICALL Java_iap_Billing_onPurchase(JNIEnv* env, jobject jCaller, jint status, jstring jdata) {
 		const char *data = env->GetStringUTFChars(jdata, NULL);
 		AutoHaxe haxe("Java_iap_Billing_onPurchase");
@@ -127,6 +162,15 @@ namespace Billing {
 		String hxdata = String(data);
 		env->ReleaseStringUTFChars(jdata, data);
 		onConsume((int)status, hxdata);
+	}
+
+	extern "C" JNIEXPORT
+	void JNICALL Java_iap_Billing_onAcknowledge(JNIEnv* env, jobject jCaller, jint status, jstring jdata) {
+		const char *data = env->GetStringUTFChars(jdata, NULL);
+		AutoHaxe haxe("Java_iap_Billing_onAcknowledge");
+		String hxdata = String(data);
+		env->ReleaseStringUTFChars(jdata, data);
+		onAcknowledge((int)status, hxdata);
 	}
 
 }
