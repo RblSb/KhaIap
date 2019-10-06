@@ -2,6 +2,10 @@
 
 namespace Billing {
 
+	pthread_key_t s_thread_key;
+	bool threadInited = false;
+	bool attached = false;
+
 	void (*onInitComplete)();
 	void (*onInitError)();
 	void (*onPurchase)(int status, String data);
@@ -9,23 +13,28 @@ namespace Billing {
 	void (*onGetPurchases)(int status, String data);
 	void (*onConsume)(int status, String data);
 	void (*onAcknowledge)(int status, String data);
-	bool attached = false;
 
 	JNIEnv* attachThread() {
+		if (!threadInited) {
+			pthread_key_create(&s_thread_key, destroyThread);
+			threadInited = true;
+		}
 		JNIEnv* env;
 		ANativeActivity* kactivity = KoreAndroid::getActivity();
-		KoreAndroid::getActivity()->vm->AttachCurrentThread(&env, NULL);
-		attached = true;
 
 		int getEnvStat = kactivity->vm->GetEnv((void**)&env, JNI_VERSION_1_4);
 		if (getEnvStat == JNI_EDETACHED) {
 			attached = true;
 			if (kactivity->vm->AttachCurrentThread(&env, 0) != 0)
 				throw std::runtime_error("Failed to attach");
-			// pthread_setspecific (s_thread_key, &env);
+			pthread_setspecific(s_thread_key, &env);
 		} else attached = false;
 
 		return env;
+	}
+
+	void destroyThread(void *env) {
+		KoreAndroid::getActivity()->vm->DetachCurrentThread();
 	}
 
 	void detachThread() {

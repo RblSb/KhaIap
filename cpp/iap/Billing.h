@@ -7,6 +7,7 @@
 namespace Billing {
 	JNIEnv* attachThread();
 	void detachThread();
+	void destroyThread(void *env);
 	void init(void (*callback)(), void (*error)(), void (*purchase)(int status, String data));
 	void setCallbacks(void (*callback)(), void (*error)(), void (*purchase)(int status, String data));
 	void getProducts(String hxids, void (*callback)(int status, String data));
