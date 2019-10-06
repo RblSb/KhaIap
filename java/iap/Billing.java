@@ -55,7 +55,7 @@ public class Billing {
 					// The BillingClient is ready. You can query purchases here.
 					onInitComplete();
 				} else {
-					Log.d("kore", "Init error " + billingResult.getResponseCode());
+					Log.d("Kinc", "Init error " + billingResult.getResponseCode());
 					onInitError();
 				}
 			}
@@ -63,7 +63,7 @@ public class Billing {
 			public void onBillingServiceDisconnected() {
 				// Try to restart the connection on the next request to
 				// Google Play by calling the startConnection() method.
-				Log.d("kore", "Disconnected");
+				Log.d("Kinc", "Disconnected");
 				onInitError();
 			}
 		});
@@ -73,7 +73,7 @@ public class Billing {
 
 	public static void getProducts(String ids) {
 		List<String> skuList = Arrays.asList(ids.split(","));
-		Log.d("kore", skuList.toString());
+		Log.d("Kinc", skuList.toString());
 		SkuDetailsParams.Builder params = SkuDetailsParams.newBuilder();
 		params.setSkusList(skuList).setType(SkuType.INAPP);
 
@@ -82,7 +82,7 @@ public class Billing {
 				@Override
 				public void onSkuDetailsResponse(BillingResult billingResult, List<SkuDetails> skuDetailsList) {
 					int responseCode = billingResult.getResponseCode();
-					// Log.d("kore", responseCode + " | " + skuDetailsList);
+					// Log.d("Kinc", responseCode + " | " + skuDetailsList);
 					if (skuDetailsList != null) {
 						for (SkuDetails sku : skuDetailsList) {
 							cacheList.remove(sku);
@@ -120,7 +120,7 @@ public class Billing {
 			}
 		}
 		if (skuDetails == null) {
-			Log.d("kore", id + " sku id not found in cache");
+			Log.d("Kinc", id + " sku id not found in cache");
 			return;
 		}
 
@@ -130,13 +130,13 @@ public class Billing {
 			.build();
 		BillingResult result = billingClient.launchBillingFlow(activity, flowParams);
 		if (result.getResponseCode() != BillingResponseCode.OK)
-			Log.d("kore", "launchBillingFlow error: " + result.getResponseCode());
+			Log.d("Kinc", "launchBillingFlow error: " + result.getResponseCode());
 	}
 
 	public static void consume(final String id) {
 		Purchase purchase = findPurchase(id);
 		if (purchase == null) {
-			Log.d("kore", id + " purchase id not found in cache");
+			Log.d("Kinc", id + " purchase id not found in cache");
 			return;
 		}
 
@@ -157,7 +157,7 @@ public class Billing {
 	public static void acknowledge(final String id) {
 		Purchase purchase = findPurchase(id);
 		if (purchase == null) {
-			Log.d("kore", id + " purchase id not found in cache");
+			Log.d("Kinc", id + " purchase id not found in cache");
 			return;
 		}
 
@@ -214,7 +214,7 @@ class PurchasesListener implements PurchasesUpdatedListener {
 	@Override
 	public void onPurchasesUpdated(BillingResult billingResult, List<Purchase> purchases) {
 		int responseCode = billingResult.getResponseCode();
-		// Log.d("kore", responseCode + " | " + purchases);
+		// Log.d("Kinc", responseCode + " | " + purchases);
 		if (purchases != null) {
 			for (Purchase purchase : purchases) {
 				cacheList.remove(purchase);
