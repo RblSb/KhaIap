@@ -2,6 +2,7 @@ package iap;
 
 import cpp.Callable;
 import haxe.Json;
+import haxe.Timer;
 
 typedef Product = {
 	id:String,
@@ -156,17 +157,17 @@ class Iap {
 	}
 
 	static function _onInitComplete():Void {
-		onInitComplete();
+		Timer.delay(() -> onInitComplete(), 50);
 	}
 
 	static function _onInitError():Void {
-		onInitError();
+		Timer.delay(() -> onInitError(), 50);
 	}
 
 	static function _onGetProducts(status:Int, data:String):Void {
 		trace(status, data);
 		if (status != 0) {
-			onInitError();
+			Timer.delay(() -> onInitError(), 50);
 			return;
 		}
 		final skus:Array<SkuDetails> = Helper.parseSkuDetails(data);
@@ -180,13 +181,13 @@ class Iap {
 				currencyCode: sku.price_currency_code
 			});
 		}
-		onGetProducts(arr);
+		Timer.delay(() -> onGetProducts(arr), 50);
 	}
 
 	static function _onGetPurchases(status:Int, data:String):Void {
 		trace(status, data);
 		if (status != 0) {
-			onGetPurchasesError(status);
+			Timer.delay(() -> onGetPurchasesError(status), 50);
 			return;
 		}
 		final purchases:Array<PurchaseDetails> = Json.parse(data);
@@ -196,7 +197,7 @@ class Iap {
 				id: purchase.productId
 			});
 		}
-		onGetPurchases(arr);
+		Timer.delay(() -> onGetPurchases(arr), 50);
 	}
 
 	static function _onPurchase(code:Int, data:String):Void {
@@ -208,20 +209,27 @@ class Iap {
 			case 7: AlreadyOwned;
 			default: Error;
 		}
-		for (purchase in purchases) onPurchase(status, {
-			id: purchase.productId
-		});
-		if (purchases.length == 0) onPurchase(status, null);
+
+		for (purchase in purchases) {
+			Timer.delay(() -> {
+				onPurchase(status, {
+					id: purchase.productId
+				});
+			}, 50);
+		}
+		if (purchases.length == 0) Timer.delay(() -> {
+			onPurchase(status, null);
+		}, 50);
 	}
 
 	static function _onConsume(status:Int, data:String):Void {
 		trace(status, data);
-		onConsume(data);
+		Timer.delay(() -> onConsume(data), 50);
 	}
 
 	static function _onAcknowledge(status:Int, data:String):Void {
 		trace(status, data);
-		onAcknowledge(data);
+		Timer.delay(() -> onAcknowledge(data), 50);
 	}
 
 	static function _emptyCallback():Void {}

@@ -42,7 +42,7 @@ public class Billing {
 	private static PurchasesListener listenerPurchases = new PurchasesListener();
 
 	public static void init() {
-		KoreActivity activity = KoreActivity.getInstance();
+		final KoreActivity activity = KoreActivity.getInstance();
 
 		billingClient = BillingClient.newBuilder(activity)
 			.enablePendingPurchases()
@@ -53,10 +53,20 @@ public class Billing {
 			public void onBillingSetupFinished(BillingResult billingResult) {
 				if (billingResult.getResponseCode() == BillingResponseCode.OK) {
 					// The BillingClient is ready. You can query purchases here.
-					onInitComplete();
+					activity.runOnUiThread(new Runnable() {
+						@Override
+						public void run() {
+							onInitComplete();
+						}
+					});
 				} else {
 					Log.d("Kinc", "Init error " + billingResult.getResponseCode());
-					onInitError();
+					activity.runOnUiThread(new Runnable() {
+						@Override
+						public void run() {
+							onInitError();
+						}
+					});
 				}
 			}
 			@Override
@@ -64,7 +74,12 @@ public class Billing {
 				// Try to restart the connection on the next request to
 				// Google Play by calling the startConnection() method.
 				Log.d("Kinc", "Disconnected");
-				onInitError();
+				activity.runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						onInitError();
+					}
+				});
 			}
 		});
 	}
@@ -81,7 +96,7 @@ public class Billing {
 			new SkuDetailsResponseListener() {
 				@Override
 				public void onSkuDetailsResponse(BillingResult billingResult, List<SkuDetails> skuDetailsList) {
-					int responseCode = billingResult.getResponseCode();
+					final int responseCode = billingResult.getResponseCode();
 					// Log.d("Kinc", responseCode + " | " + skuDetailsList);
 					if (skuDetailsList != null) {
 						for (SkuDetails sku : skuDetailsList) {
@@ -89,9 +104,14 @@ public class Billing {
 							cacheList.add(sku);
 						}
 					}
-					String jsonArray = arrayToJson(skuDetailsList);
+					final String jsonArray = arrayToJson(skuDetailsList);
 					// Process the result.
-					onGetProducts(responseCode, jsonArray);
+					KoreActivity.getInstance().runOnUiThread(new Runnable() {
+						@Override
+						public void run() {
+							onGetProducts(responseCode, jsonArray);
+						}
+					});
 				}
 			}
 		);
@@ -106,31 +126,42 @@ public class Billing {
 				PurchasesListener.cacheList.add(purchase);
 			}
 		}
-		String jsonArray = arrayToJson(purchases);
-		int code = result.getResponseCode();
-		onGetPurchases(code, jsonArray);
+		final String jsonArray = arrayToJson(purchases);
+		final int code = result.getResponseCode();
+
+		KoreActivity.getInstance().runOnUiThread(new Runnable() {
+			@Override
+			public void run() {
+				onGetPurchases(code, jsonArray);
+			}
+		});
 	}
 
-	public static void purchase(String id) {
-		SkuDetails skuDetails = null;
-		for (SkuDetails sku : cacheList) {
-			if (sku.getSku().equals(id)) {
-				skuDetails = sku;
-				break;
-			}
-		}
-		if (skuDetails == null) {
-			Log.d("Kinc", id + " sku id not found in cache");
-			return;
-		}
+	public static void purchase(final String id) {
+		final KoreActivity activity = KoreActivity.getInstance();
+		activity.runOnUiThread(new Runnable() {
+			@Override
+			public void run() {
+				SkuDetails skuDetails = null;
+				for (SkuDetails sku : cacheList) {
+					if (sku.getSku().equals(id)) {
+						skuDetails = sku;
+						break;
+					}
+				}
+				if (skuDetails == null) {
+					Log.d("Kinc", id + " sku id not found in cache");
+					return;
+				}
 
-		KoreActivity activity = KoreActivity.getInstance();
-		BillingFlowParams flowParams = BillingFlowParams.newBuilder()
-			.setSkuDetails(skuDetails)
-			.build();
-		BillingResult result = billingClient.launchBillingFlow(activity, flowParams);
-		if (result.getResponseCode() != BillingResponseCode.OK)
-			Log.d("Kinc", "launchBillingFlow error: " + result.getResponseCode());
+				BillingFlowParams flowParams = BillingFlowParams.newBuilder()
+					.setSkuDetails(skuDetails)
+					.build();
+				BillingResult result = billingClient.launchBillingFlow(activity, flowParams);
+				if (result.getResponseCode() != BillingResponseCode.OK)
+					Log.d("Kinc", "launchBillingFlow error: " + result.getResponseCode());
+			}
+		});
 	}
 
 	public static void consume(final String id) {
@@ -148,8 +179,13 @@ public class Billing {
 		billingClient.consumeAsync(consumeParams, new ConsumeResponseListener() {
 			@Override
 			public void onConsumeResponse(BillingResult billingResult, String outToken) {
-				int responseCode = billingResult.getResponseCode();
-				onConsume(responseCode, id);
+				final int responseCode = billingResult.getResponseCode();
+				KoreActivity.getInstance().runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						onConsume(responseCode, id);
+					}
+				});
 			}
 		});
 	}
@@ -171,8 +207,13 @@ public class Billing {
 		billingClient.acknowledgePurchase(acknowledgePurchaseParams, new AcknowledgePurchaseResponseListener() {
 			@Override
 			public void onAcknowledgePurchaseResponse(BillingResult billingResult) {
-				int responseCode = billingResult.getResponseCode();
-				onAcknowledge(responseCode, id);
+				final int responseCode = billingResult.getResponseCode();
+				KoreActivity.getInstance().runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						onAcknowledge(responseCode, id);
+					}
+				});
 			}
 		});
 	}
@@ -213,7 +254,7 @@ class PurchasesListener implements PurchasesUpdatedListener {
 
 	@Override
 	public void onPurchasesUpdated(BillingResult billingResult, List<Purchase> purchases) {
-		int responseCode = billingResult.getResponseCode();
+		final int responseCode = billingResult.getResponseCode();
 		// Log.d("Kinc", responseCode + " | " + purchases);
 		if (purchases != null) {
 			for (Purchase purchase : purchases) {
@@ -221,8 +262,14 @@ class PurchasesListener implements PurchasesUpdatedListener {
 				cacheList.add(purchase);
 			}
 		}
-		String jsonArray = Billing.arrayToJson(purchases);
-		Billing.onPurchase(responseCode, jsonArray);
+		final String jsonArray = Billing.arrayToJson(purchases);
+
+		KoreActivity.getInstance().runOnUiThread(new Runnable() {
+			@Override
+			public void run() {
+				Billing.onPurchase(responseCode, jsonArray);
+			}
+		});
 	}
 
 }
